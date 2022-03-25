@@ -1,0 +1,68 @@
+
+service: weather-central
+
+frameworkVersion: '3'
+
+plugins:
+  - serverless-s3-sync
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+
+custom:
+  bucketName: weather-central-site
+  siteName: http://weather-central-site.s3-website-us-east-1.amazonaws.com
+  s3Sync:
+    - bucketName: weather-central-site
+      localDir: static
+
+functions:
+  GET:
+    handler: Controller/GET.handler
+    package:
+      include:
+        - Controller/GET.js
+    events:
+      - http:
+          path: /weather
+          method: get
+          cors: true
+    environment:
+      OPEN_WEATHER_MAP_API_KEY: cf002751564a4c78f5f7ed479f1b9ba3 # TODO ~ get from .env
+      OPEN_WEATHER_MAP_API_URL: https://api.openweathermap.org/data/2.5/weather?
+      ORIGIN_ALLOWED_1: ${self:custom.siteName}
+      
+
+resources:
+ Resources:
+    SiteBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        AccessControl: PublicRead
+        BucketName: ${self:custom.bucketName}
+        WebsiteConfiguration:
+          IndexDocument: index.html
+    
+    StaticSiteS3BucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket:
+          Ref: SiteBucket
+        PolicyDocument:
+          Statement:
+            - Sid: PublicReadGetObject
+              Effect: Allow
+              Principal: "*"
+              Action:
+              - s3:GetObject
+              Resource:
+                Fn::Join: [
+                  "", [
+                    "arn:aws:s3:::",
+                    {
+                      "Ref": "SiteBucket"
+                    },
+                    "/*"
+                  ]
+                ]
